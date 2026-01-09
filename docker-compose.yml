@@ -1,0 +1,49 @@
+services:
+  photoprism:
+    image: photoprism/photoprism:latest
+    container_name: photoprism
+    restart: unless-stopped
+
+    env_file:
+      - .env
+
+    ports:
+      # 仅监听本地，配合反向代理使用
+      - "127.0.0.1:2342:2342"
+      
+    environment:
+      PHOTOPRISM_UID: "${PHOTOPRISM_UID}"
+      PHOTOPRISM_GID: "${PHOTOPRISM_GID}"
+      PHOTOPRISM_HTTP_COMPRESSION: "gzip"
+      PHOTOPRISM_DATABASE_DRIVER: "mysql"
+      PHOTOPRISM_DATABASE_SERVER: "mariadb:3306"
+      PHOTOPRISM_DATABASE_NAME: "photoprism"
+      PHOTOPRISM_DATABASE_USER: "photoprism"
+      PHOTOPRISM_DETECT_NSFW: "false"
+      PHOTOPRISM_UPLOAD_NSFW: "false"
+
+    volumes:
+      - "${HOST_ORIGINALS_PATH}:/photoprism/originals"
+      - "${HOST_STORAGE_PATH}:/photoprism/storage"
+      # 挂载内存盘做临时目录，提高速度并解决权限问题
+      - type: tmpfs
+        target: /tmp
+
+    depends_on:
+      - mariadb
+
+  mariadb:
+    image: mariadb:10.11
+    container_name: mariadb
+    restart: unless-stopped
+    env_file:
+      - .env
+    command:
+      - --transaction-isolation=READ-COMMITTED
+      - --log-bin=ON
+      - --binlog-format=ROW
+      - --innodb-buffer-pool-size=256M
+      - --max-connections=64
+    volumes:
+      - "${HOST_DB_PATH}:/var/lib/mysql"
+    # 数据库完全隔离，无需暴露端口
