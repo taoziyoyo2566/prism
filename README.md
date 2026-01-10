@@ -50,7 +50,7 @@ sudo chown -R photoprism:photoprism /opt/photoprism
 
 ### 1) `.env`
 
-`.env` 用于统一管理环境变量。以下为关键项（示例值请替换）：
+`.env` 用于统一管理环境变量。可直接运行 `scripts/prep.sh` 自动生成并填入随机密码：
 
 ```
 PHOTOPRISM_ADMIN_PASSWORD=你的管理员密码
@@ -90,8 +90,18 @@ PHOTOPRISM_ORIGINALS_LIMIT=500
 
 ```bash
 cd /home/kagoya/workspace/prism
-sudo docker compose up -d
-sudo docker compose logs -f --tail=100 photoprism
+sudo ./scripts/prep.sh
+docker compose up -d
+docker compose logs -f --tail=100 photoprism
+```
+
+`scripts/prep.sh` 会在缺少 `.env` 时自动生成，并尝试将当前用户加入 `docker` 组；如刚被加入需重新登录后再执行 `docker compose up -d`。
+
+或者使用一键脚本（会先执行准备，再启动服务）：
+
+```bash
+cd /home/kagoya/workspace/prism
+./scripts/up.sh
 ```
 
 当日志出现 `waiting for the database to become available` 后，首次启动会等待数据库初始化。
