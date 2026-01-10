@@ -3,7 +3,7 @@ set -euo pipefail
 
 REPO_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 ENV_FILE="$REPO_DIR/.env"
-PRISM_USER="prism"
+PRISM_USER="photoprism"
 RUN_USER="${SUDO_USER:-}"
 ENV_CREATED="false"
 ADMIN_PASSWORD=""
@@ -18,7 +18,12 @@ random_password() {
 }
 
 if ! id "$PRISM_USER" >/dev/null 2>&1; then
-  useradd -m -s /bin/bash "$PRISM_USER"
+  useradd -r -s /bin/false -M "$PRISM_USER"
+else
+  PRISM_SHELL=$(getent passwd "$PRISM_USER" | cut -d: -f7)
+  if [[ "$PRISM_SHELL" != "/bin/false" ]]; then
+    echo "Warning: user $PRISM_USER has login shell ($PRISM_SHELL). Consider setting to /bin/false." >&2
+  fi
 fi
 
 PRISM_UID=$(id -u "$PRISM_USER")
@@ -88,7 +93,6 @@ chown -R "${TARGET_UID}:${TARGET_GID}" \
   "$HOST_ORIGINALS_PATH" "$HOST_STORAGE_PATH" "$HOST_DB_PATH"
 
 if getent group docker >/dev/null 2>&1; then
-  usermod -aG docker "$PRISM_USER"
   if [[ -n "$RUN_USER" && "$RUN_USER" != "root" && "$RUN_USER" != "$PRISM_USER" ]]; then
     usermod -aG docker "$RUN_USER"
   fi
