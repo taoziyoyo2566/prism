@@ -3,34 +3,52 @@ services:
     image: photoprism/photoprism:latest
     container_name: photoprism
     restart: unless-stopped
-
     env_file:
       - .env
+    
+    # [修改点 1] 注释掉或删除这里的 ports，不再直接暴露给宿主机
+    # ports:
+    #   - "127.0.0.1:2342:2342"
 
-    ports:
-      # 仅监听本地，配合反向代理使用
-      - "127.0.0.1:2342:2342"
-      
     environment:
       PHOTOPRISM_UID: "${PHOTOPRISM_UID}"
       PHOTOPRISM_GID: "${PHOTOPRISM_GID}"
-      PHOTOPRISM_HTTP_COMPRESSION: "gzip"
+      # [修改点 2] 保持 gzip 开启，虽然 Nginx 会请求非压缩数据，但内部保持默认即可
+      PHOTOPRISM_HTTP_COMPRESSION: "gzip" 
       PHOTOPRISM_DATABASE_DRIVER: "mysql"
       PHOTOPRISM_DATABASE_SERVER: "mariadb:3306"
       PHOTOPRISM_DATABASE_NAME: "photoprism"
       PHOTOPRISM_DATABASE_USER: "photoprism"
       PHOTOPRISM_DETECT_NSFW: "false"
       PHOTOPRISM_UPLOAD_NSFW: "false"
+      # [可选] 既然有反代，信任 Nginx 传递的 IP
+      PHOTOPRISM_SITE_URL: "https://prism.你的域名.com" 
 
     volumes:
       - "${HOST_ORIGINALS_PATH}:/photoprism/originals"
       - "${HOST_STORAGE_PATH}:/photoprism/storage"
-      # 挂载内存盘做临时目录，提高速度并解决权限问题
       - type: tmpfs
         target: /tmp
 
     depends_on:
       - mariadb
+
+  # [修改点 3] 新增 Nginx 服务作为中间层
+  nginx-proxy:
+    image: openresty/openresty:alpine
+    container_name: prism_nginx
+    restart: unless-stopped
+    ports:
+      # 这里接管原来的 2342 端口
+      - "127.0.0.1:2342:80"
+    volumes:
+      # 挂载刚才创建的配置文件
+      - ./nginx.conf:/usr/local/openresty/nginx/conf/nginx.conf:ro
+      - ./html:/var/www/html:ro
+      # 让 Nginx 能够访问 PhotoPrism 的存储数据（如果需要）
+      - "${HOST_STORAGE_PATH}:/photoprism/storage:ro" 
+    depends_on:
+      - photoprism
 
   mariadb:
     image: mariadb:10.11
@@ -46,4 +64,3 @@ services:
       - --max-connections=64
     volumes:
       - "${HOST_DB_PATH}:/var/lib/mysql"
-    # 数据库完全隔离，无需暴露端口
